@@ -15,6 +15,7 @@ import {
   resolveAndValidatePath,
   unescapePath,
   isSubpath,
+  resolvePathWithMixedScriptSpacingFix,
   shortenPath,
   tildeifyPath,
 } from './paths.js';
@@ -412,6 +413,35 @@ describe('resolvePath', () => {
   it('handles parent directory references', () => {
     const result = resolvePath('/base/dir/subdir', '..');
     expect(result).toBe(path.resolve('/base/dir/subdir', '..'));
+  });
+});
+
+describe('resolvePathWithMixedScriptSpacingFix', () => {
+  let tempRoot: string;
+
+  beforeAll(() => {
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mixed-script-path-'));
+  });
+
+  afterAll(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('returns corrected existing path when CJK/Latin spacing is accidental', () => {
+    const realDir = path.join(tempRoot, 'image图片');
+    const realFile = path.join(realDir, 'target.txt');
+    fs.mkdirSync(realDir, { recursive: true });
+    fs.writeFileSync(realFile, 'ok');
+
+    const mangled = path.join(tempRoot, 'image 图片', 'target.txt');
+    expect(resolvePathWithMixedScriptSpacingFix(mangled)).toBe(realFile);
+  });
+
+  it('returns normalized original path when no corrected existing path is found', () => {
+    const mangled = path.join(tempRoot, 'does not exist', 'target.txt');
+    expect(resolvePathWithMixedScriptSpacingFix(mangled)).toBe(
+      path.normalize(mangled),
+    );
   });
 });
 
