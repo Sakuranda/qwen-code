@@ -38,6 +38,20 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
+function isWindowsGitBashEnvironment(): boolean {
+  const msystem = process.env['MSYSTEM']?.toUpperCase() ?? '';
+  if (msystem.startsWith('MINGW') || msystem.startsWith('MSYS')) {
+    return true;
+  }
+
+  const term = process.env['TERM']?.toLowerCase() ?? '';
+  if (term.includes('msys') || term.includes('cygwin')) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
@@ -48,6 +62,10 @@ export interface ShellConfiguration {
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    if (isWindowsGitBashEnvironment()) {
+      return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+    }
+
     const comSpec = process.env['ComSpec'] || 'cmd.exe';
     const executable = comSpec.toLowerCase();
 

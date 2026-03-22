@@ -38,6 +38,7 @@ import {
   splitCommands,
   stripShellWrapper,
   detectCommandSubstitution,
+  getShellConfiguration,
 } from '../utils/shell-utils.js';
 import { createDebugLogger } from '../utils/debugLogger.js';
 import {
@@ -527,13 +528,17 @@ Co-authored-by: ${gitCoAuthorSettings.name} <${gitCoAuthorSettings.email}>`;
 }
 
 function getShellToolDescription(): string {
-  const isWindows = os.platform() === 'win32';
-  const executionWrapper = isWindows
-    ? 'cmd.exe /c <command>'
-    : 'bash -c <command>';
-  const processGroupNote = isWindows
-    ? ''
-    : '\n  - Command is executed as a subprocess that leads its own process group. Command process group can be terminated as `kill -- -PGID` or signaled as `kill -s SIGNAL -- -PGID`.';
+  const { shell } = getShellConfiguration();
+  const executionWrapper =
+    shell === 'powershell'
+      ? 'powershell -Command <command>'
+      : shell === 'cmd'
+        ? 'cmd.exe /c <command>'
+        : 'bash -c <command>';
+  const processGroupNote =
+    os.platform() === 'win32'
+      ? ''
+      : '\n  - Command is executed as a subprocess that leads its own process group. Command process group can be terminated as `kill -- -PGID` or signaled as `kill -s SIGNAL -- -PGID`.';
 
   return `Executes a given shell command (as \`${executionWrapper}\`) in a persistent shell session with optional timeout, ensuring proper handling and security measures.
 
@@ -585,17 +590,23 @@ ${processGroupNote}
 function getCommandDescription(): string {
   const cmd_substitution_warning =
     '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
-  if (os.platform() === 'win32') {
+  const { shell } = getShellConfiguration();
+  if (shell === 'powershell') {
+    return (
+      'Exact PowerShell command to execute as `powershell -Command <command>`' +
+      cmd_substitution_warning
+    );
+  }
+  if (shell === 'cmd') {
     return (
       'Exact command to execute as `cmd.exe /c <command>`' +
       cmd_substitution_warning
     );
-  } else {
-    return (
-      'Exact bash command to execute as `bash -c <command>`' +
-      cmd_substitution_warning
-    );
   }
+  return (
+    'Exact bash command to execute as `bash -c <command>`' +
+    cmd_substitution_warning
+  );
 }
 
 export class ShellTool extends BaseDeclarativeTool<
