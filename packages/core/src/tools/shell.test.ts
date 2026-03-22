@@ -43,6 +43,7 @@ describe('ShellTool', () => {
   let mockConfig: Config;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,6 +89,10 @@ describe('ShellTool', () => {
         }),
       };
     });
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
   });
 
   describe('isCommandAllowed', () => {
@@ -961,6 +966,13 @@ describe('ShellTool', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
+    });
+
+    it('should return the Git Bash description when on Windows Git Bash', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      process.env['MSYSTEM'] = 'MINGW64';
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toContain('`bash -c <command>`');
     });
 
     it('should return the non-windows description when not on windows', () => {

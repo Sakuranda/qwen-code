@@ -526,7 +526,7 @@ describe('getShellConfiguration', () => {
   const originalEnv = { ...process.env };
 
   afterEach(() => {
-    process.env = originalEnv;
+    process.env = { ...originalEnv };
   });
 
   it('should return bash configuration on Linux', () => {
@@ -548,6 +548,25 @@ describe('getShellConfiguration', () => {
   describe('on Windows', () => {
     beforeEach(() => {
       mockPlatform.mockReturnValue('win32');
+    });
+
+    it('should return bash configuration when MSYSTEM indicates Git Bash', () => {
+      process.env['MSYSTEM'] = 'MINGW64';
+      process.env['ComSpec'] = 'C:\\WINDOWS\\system32\\cmd.exe';
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should return bash configuration when TERM indicates msys', () => {
+      process.env['TERM'] = 'xterm-256color-msys';
+      process.env['ComSpec'] =
+        'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
     });
 
     it('should return cmd.exe configuration by default', () => {
