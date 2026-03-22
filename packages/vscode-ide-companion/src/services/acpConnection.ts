@@ -89,6 +89,11 @@ export class AcpConnection {
     this.workingDir = workingDir;
 
     const env = { ...process.env };
+    if (env['ELECTRON_RUN_AS_NODE'] !== '1') {
+      // In VS Code extension host, process.execPath points to an Electron binary.
+      // Force Node mode so `cli.js --acp` runs as a child Node process.
+      env['ELECTRON_RUN_AS_NODE'] = '1';
+    }
 
     const proxyArg = extraArgs.find(
       (arg, i) => arg === '--proxy' && i + 1 < extraArgs.length,

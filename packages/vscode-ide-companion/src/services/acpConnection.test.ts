@@ -7,13 +7,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RequestError } from '@agentclientprotocol/sdk';
 import type { ContentBlock } from '@agentclientprotocol/sdk';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 // AcpConnection imports AcpFileHandler which imports vscode.
 // Mock vscode so it can be resolved without the actual VS Code runtime.
 vi.mock('vscode', () => ({}));
+vi.mock('child_process', () => ({
+  spawn: vi.fn(),
+}));
 
 import { AcpConnection } from './acpConnection.js';
 import { ACP_ERROR_CODES } from '../constants/acpSchema.js';
+import { spawn } from 'child_process';
 
 type AcpConnectionInternal = {
   child: { killed: boolean; exitCode: number | null; kill?: () => void } | null;
@@ -222,5 +229,38 @@ describe('AcpConnection lastExitCode/lastExitSignal', () => {
     const conn = createConnection();
     expect(conn.lastExitCode).toBeNull();
     expect(conn.lastExitSignal).toBeNull();
+  });
+});
+
+describe('AcpConnection.connect spawn environment', () => {
+  it('sets ELECTRON_RUN_AS_NODE=1 when spawning ACP child process', async () => {
+    const spawnMock = vi.mocked(spawn);
+    const setupHandlersSpy = vi
+      .spyOn(
+        AcpConnection.prototype as unknown as {
+          setupChildProcessHandlers: () => Promise<void>;
+        },
+        'setupChildProcessHandlers',
+      )
+      .mockResolvedValue();
+
+    spawnMock.mockReturnValue(
+      createMockChild({ stderr: { on: vi.fn() } }) as never,
+    );
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'acp-connection-'));
+    const cliEntryPath = path.join(tempDir, 'cli.js');
+    fs.writeFileSync(cliEntryPath, '');
+
+    const conn = new AcpConnection();
+    await conn.connect(cliEntryPath, tempDir);
+
+    expect(spawnMock).toHaveBeenCalledOnce();
+    const options = spawnMock.mock.calls[0]?.[2] as
+      | { env?: NodeJS.ProcessEnv }
+      | undefined;
+    expect(options?.env?.ELECTRON_RUN_AS_NODE).toBe('1');
+
+    setupHandlersSpy.mockRestore();
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 });
